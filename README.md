@@ -79,12 +79,4 @@ Feel free to fork this repo, raise issues, and submit pull requests to improve c
 
 ---
 
-## 🧑‍💻 Author
-
-👤 **\[Sumit Nayek]**
-Data Science & AI Enthusiast | Passionate about Algorithms and Problem Solving
-
-```
-
----
 
