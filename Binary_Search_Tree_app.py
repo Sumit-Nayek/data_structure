@@ -7,36 +7,119 @@ class BSTNode:
         self.value = value
         self.left = None
         self.right = None
+        self.height = 1  # Added for AVL tree
 
 class BinarySearchTree:
-    """Binary Search Tree implementation for Streamlit"""
+    """Binary Search Tree implementation with AVL balancing"""
     
     def __init__(self):
         self.root = None
+        self.avl_mode = False
+    
+    def set_avl_mode(self, enabled):
+        """Enable or disable AVL balancing"""
+        self.avl_mode = enabled
+    
+    def get_height(self, node):
+        """Get height of a node"""
+        if not node:
+            return 0
+        return node.height
+    
+    def update_height(self, node):
+        """Update height of a node"""
+        if node:
+            node.height = 1 + max(self.get_height(node.left), self.get_height(node.right))
+    
+    def get_balance(self, node):
+        """Get balance factor of a node"""
+        if not node:
+            return 0
+        return self.get_height(node.left) - self.get_height(node.right)
+    
+    def rotate_right(self, y):
+        """Right rotation for AVL balancing"""
+        x = y.left
+        T2 = x.right
+        
+        # Perform rotation
+        x.right = y
+        y.left = T2
+        
+        # Update heights
+        self.update_height(y)
+        self.update_height(x)
+        
+        return x
+    
+    def rotate_left(self, x):
+        """Left rotation for AVL balancing"""
+        y = x.right
+        T2 = y.left
+        
+        # Perform rotation
+        y.left = x
+        x.right = T2
+        
+        # Update heights
+        self.update_height(x)
+        self.update_height(y)
+        
+        return y
+    
+    def balance_node(self, node):
+        """Balance a node using AVL rotations"""
+        if not node:
+            return node
+        
+        # Update height
+        self.update_height(node)
+        
+        # Get balance factor
+        balance = self.get_balance(node)
+        
+        # Left Left Case
+        if balance > 1 and self.get_balance(node.left) >= 0:
+            return self.rotate_right(node)
+        
+        # Right Right Case
+        if balance < -1 and self.get_balance(node.right) <= 0:
+            return self.rotate_left(node)
+        
+        # Left Right Case
+        if balance > 1 and self.get_balance(node.left) < 0:
+            node.left = self.rotate_left(node.left)
+            return self.rotate_right(node)
+        
+        # Right Left Case
+        if balance < -1 and self.get_balance(node.right) > 0:
+            node.right = self.rotate_right(node.right)
+            return self.rotate_left(node)
+        
+        return node
+    
+    def _insert(self, node, value):
+        """Recursive insert helper"""
+        if not node:
+            return BSTNode(value)
+        
+        if value < node.value:
+            node.left = self._insert(node.left, value)
+        elif value > node.value:
+            node.right = self._insert(node.right, value)
+        else:
+            return node  # Duplicate values not allowed
+        
+        # AVL balancing if enabled
+        if self.avl_mode:
+            return self.balance_node(node)
+        
+        return node
     
     def insert(self, value):
-        """Insert a value into the BST"""
-        new_node = BSTNode(value)
-        
-        if self.root is None:
-            self.root = new_node
-            return True
-        
-        temp = self.root
-        while True:
-            if new_node.value == temp.value:
-                return False
-            
-            if new_node.value < temp.value:
-                if temp.left is None:
-                    temp.left = new_node
-                    return True
-                temp = temp.left
-            else:
-                if temp.right is None:
-                    temp.right = new_node
-                    return True
-                temp = temp.right
+        """Insert a value into the BST/AVL tree"""
+        self.root = self._insert(self.root, value)
+        return True
     
     def contains(self, value):
         """Check if value exists in BST"""
@@ -76,19 +159,15 @@ class BinarySearchTree:
         
         return current.value
     
-    def delete(self, value):
-        """Delete a value from BST"""
-        self.root = self._delete_node(self.root, value)
-    
-    def _delete_node(self, node, value):
-        """Recursive helper for delete"""
-        if node is None:
+    def _delete(self, node, value):
+        """Recursive delete helper"""
+        if not node:
             return node
         
         if value < node.value:
-            node.left = self._delete_node(node.left, value)
+            node.left = self._delete(node.left, value)
         elif value > node.value:
-            node.right = self._delete_node(node.right, value)
+            node.right = self._delete(node.right, value)
         else:
             # Node found
             if node.left is None:
@@ -99,9 +178,17 @@ class BinarySearchTree:
             # Node with two children
             min_node = self._find_min_node(node.right)
             node.value = min_node.value
-            node.right = self._delete_node(node.right, min_node.value)
+            node.right = self._delete(node.right, min_node.value)
+        
+        # AVL balancing if enabled
+        if self.avl_mode:
+            return self.balance_node(node)
         
         return node
+    
+    def delete(self, value):
+        """Delete a value from BST"""
+        self.root = self._delete(self.root, value)
     
     def _find_min_node(self, node):
         """Find node with minimum value in subtree"""
@@ -187,7 +274,9 @@ class BinarySearchTree:
                 'min_value': None,
                 'max_value': None,
                 'is_valid_bst': True,
-                'is_balanced': True
+                'is_balanced': True,
+                'balance_factor': 0,
+                'tree_type': 'AVL' if self.avl_mode else 'BST'
             }
         
         node_count = len(self.inorder_traversal())
@@ -201,7 +290,9 @@ class BinarySearchTree:
             'min_value': min_val,
             'max_value': max_val,
             'is_valid_bst': self._is_valid_bst(),
-            'is_balanced': self._is_balanced()
+            'is_balanced': self._is_balanced(),
+            'balance_factor': self.get_balance(self.root),
+            'tree_type': 'AVL' if self.avl_mode else 'BST'
         }
     
     def _is_valid_bst(self):
@@ -217,7 +308,7 @@ class BinarySearchTree:
         return validate(self.root)
     
     def _is_balanced(self):
-        """Check if tree is balanced"""
+        """Check if tree is balanced (AVL property)"""
         def check_balance(node):
             if node is None:
                 return True, 0
@@ -239,11 +330,13 @@ def initialize_session_state():
         st.session_state.bst = BinarySearchTree()
     if 'auto_demo_done' not in st.session_state:
         st.session_state.auto_demo_done = False
+    if 'avl_enabled' not in st.session_state:
+        st.session_state.avl_enabled = False
 
 def main():
     """Main Streamlit application"""
     st.set_page_config(
-        page_title="BST Visualization",
+        page_title="BST & AVL Tree Simulator",
         page_icon="🌳",
         layout="wide",
         initial_sidebar_state="expanded"
@@ -267,6 +360,13 @@ def main():
         border-radius: 10px;
         margin: 1rem 0;
     }
+    .avl-info {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+    }
     .success-box {
         background-color: #d4edda;
         color: #155724;
@@ -275,23 +375,35 @@ def main():
         border: 1px solid #c3e6cb;
         margin: 0.5rem 0;
     }
-    .error-box {
-        background-color: #f8d7da;
-        color: #721c24;
+    .warning-box {
+        background-color: #fff3cd;
+        color: #856404;
         padding: 1rem;
         border-radius: 5px;
-        border: 1px solid #f5c6cb;
+        border: 1px solid #ffeaa7;
         margin: 0.5rem 0;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # Header
-    st.markdown('<h1 class="main-header">🌳 Binary Search Tree Simulator</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🌳 BST & AVL Tree Simulator</h1>', unsafe_allow_html=True)
+    
+    # AVL Mode Toggle
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        avl_enabled = st.toggle("🔄 Enable AVL Tree Balancing", 
+                               value=st.session_state.avl_enabled,
+                               help="When enabled, tree automatically balances after each operation")
+        
+        if avl_enabled != st.session_state.avl_enabled:
+            st.session_state.avl_enabled = avl_enabled
+            st.session_state.bst.set_avl_mode(avl_enabled)
+            st.rerun()
     
     # Sidebar for operations
     with st.sidebar:
-        st.header("🎯 BST Operations")
+        st.header("🎯 Tree Operations")
         
         # Insert operation
         st.subheader("Insert Node")
@@ -343,17 +455,44 @@ def main():
         # Demo operations
         st.markdown("---")
         st.subheader("Demo Operations")
-        demo_values = [50, 30, 70, 20, 40, 60, 80, 10, 25, 35, 45]
         
-        if st.button("🎮 Auto Demo", use_container_width=True):
+        demo_option = st.selectbox(
+            "Choose demo sequence:",
+            ["Balanced Sequence", "Sorted Sequence", "Random Sequence", "Unbalanced Sequence"]
+        )
+        
+        if st.button("🎮 Run Demo", use_container_width=True):
             st.session_state.bst = BinarySearchTree()
-            for val in demo_values:
+            st.session_state.bst.set_avl_mode(st.session_state.avl_enabled)
+            
+            if demo_option == "Balanced Sequence":
+                # Balanced insertion sequence
+                values = [50, 25, 75, 15, 35, 65, 85]
+                sequence_info = "Root-first, then level-by-level insertion"
+            elif demo_option == "Sorted Sequence":
+                # Worst-case for BST, best case for AVL to show balancing
+                values = [10, 20, 30, 40, 50, 60, 70]
+                sequence_info = "Sorted ascending order - worst case for BST"
+            elif demo_option == "Random Sequence":
+                # Random values
+                values = [42, 23, 67, 15, 38, 55, 89]
+                sequence_info = "Random insertion order"
+            else:  # Unbalanced Sequence
+                # Creates a skewed tree
+                values = [10, 20, 30, 40, 50, 60, 70] if not st.session_state.avl_enabled else [50, 60, 70, 80, 90, 100]
+                sequence_info = "Creates highly unbalanced tree (shows AVL power)"
+            
+            for val in values:
                 st.session_state.bst.insert(val)
+            
             st.session_state.auto_demo_done = True
-            st.success("✅ Demo tree created with values: " + ", ".join(map(str, demo_values)))
+            st.success(f"✅ Demo created with {demo_option}!")
+            st.info(f"**Sequence:** {values}")
+            st.info(f"**Pattern:** {sequence_info}")
         
         if st.button("🧹 Clear Tree", use_container_width=True):
             st.session_state.bst = BinarySearchTree()
+            st.session_state.bst.set_avl_mode(st.session_state.avl_enabled)
             st.session_state.auto_demo_done = False
             st.success("✅ Tree cleared successfully!")
     
@@ -397,14 +536,16 @@ def main():
         tree_info = st.session_state.bst.get_tree_info()
         
         if tree_info['root'] is not None:
+            info_style = "avl-info" if st.session_state.avl_enabled else "tree-info"
             st.markdown(f"""
-            <div class="tree-info">
-                <h3>🌲 Tree Stats</h3>
+            <div class="{info_style}">
+                <h3>🌲 {tree_info['tree_type']} Tree Stats</h3>
                 <p><strong>Root:</strong> {tree_info['root']}</p>
                 <p><strong>Height:</strong> {tree_info['height']}</p>
                 <p><strong>Total Nodes:</strong> {tree_info['node_count']}</p>
                 <p><strong>Min Value:</strong> {tree_info['min_value']}</p>
                 <p><strong>Max Value:</strong> {tree_info['max_value']}</p>
+                <p><strong>Balance Factor:</strong> {tree_info['balance_factor']}</p>
                 <p><strong>Valid BST:</strong> {'✅' if tree_info['is_valid_bst'] else '❌'}</p>
                 <p><strong>Balanced:</strong> {'✅' if tree_info['is_balanced'] else '❌'}</p>
             </div>
@@ -414,7 +555,7 @@ def main():
     
     # Educational content
     st.markdown("---")
-    st.header("🎓 BST Learning Guide")
+    st.header("🎓 BST & AVL Tree Learning Guide")
     
     exp_col1, exp_col2 = st.columns(2)
     
@@ -423,36 +564,41 @@ def main():
         st.markdown("""
         - **Binary Tree Structure**: Each node has at most 2 children
         - **Search Property**: Left child < Parent < Right child
-        - **Efficient Operations**: O(log n) average case complexity
-        - **Sorted Order**: In-order traversal gives sorted values
-        - **Dynamic Structure**: Easy to insert and delete nodes
+        - **Efficient Operations**: O(log n) average case
+        - **Worst Case**: O(n) for skewed trees
+        - **No Auto-balancing**: Can become unbalanced
         """)
         
-        st.subheader("🎯 Operations Complexity")
+        st.subheader("🔄 AVL Tree Properties")
         st.markdown("""
-        - **Search**: O(h) - depends on tree height
-        - **Insert**: O(h) - find position and insert  
-        - **Delete**: O(h) - find and reorganize
-        - **Traversal**: O(n) - visit all nodes
-        - **Min/Max**: O(h) - follow left/right pointers
+        - **Self-balancing**: Automatically maintains balance
+        - **Balance Factor**: |left_height - right_height| ≤ 1
+        - **Rotations**: Uses single/double rotations
+        - **Guaranteed Performance**: O(log n) worst case
+        - **Overhead**: Extra height/balance calculations
         """)
     
     with exp_col2:
-        st.subheader("🔄 Traversal Types")
+        st.subheader("🎯 AVL Rotations")
         st.markdown("""
-        - **In-order**: Left → Root → Right (Gives sorted order)
-        - **Pre-order**: Root → Left → Right (Useful for copying trees)
-        - **Post-order**: Left → Right → Root (Useful for deletion)
-        - **Level-order**: Level by level (Breadth-first search)
+        **Four Rotation Cases:**
+        1. **Left-Left**: Right rotation
+        2. **Right-Right**: Left rotation  
+        3. **Left-Right**: Left then Right rotation
+        4. **Right-Left**: Right then Left rotation
+        
+        **When Rotations Occur:**
+        - After insertions that cause imbalance
+        - After deletions that cause imbalance
+        - Balance factor becomes ±2
         """)
         
-        st.subheader("💡 Pro Tips")
+        st.subheader("💡 Demo Sequences")
         st.markdown("""
-        - Keep tree balanced for optimal O(log n) performance
-        - Use in-order traversal to get sorted values
-        - BSTs are excellent for dynamic data sets
-        - Monitor tree height for performance optimization
-        - Perfect for range queries and ordered operations
+        **Balanced Sequence**: Shows ideal BST structure
+        **Sorted Sequence**: Worst-case for BST, shows AVL power
+        **Random Sequence**: Typical real-world scenario
+        **Unbalanced Sequence**: Demonstrates AVL balancing
         """)
 
 if __name__ == "__main__":
