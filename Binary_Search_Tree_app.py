@@ -9,7 +9,6 @@ class BSTNode:
         self.value = value
         self.left = None
         self.right = None
-        self.parent = None
 
 class BinarySearchTree:
     """Binary Search Tree implementation for Streamlit"""
@@ -48,7 +47,6 @@ class BinarySearchTree:
             if new_node.value < temp.value:
                 if temp.left is None:
                     temp.left = new_node
-                    new_node.parent = temp
                     path.append(f"Left({value})")
                     self.log_operation("INSERT", value, "Success", f"Path: {' → '.join(path)}")
                     return True
@@ -57,7 +55,6 @@ class BinarySearchTree:
             else:
                 if temp.right is None:
                     temp.right = new_node
-                    new_node.parent = temp
                     path.append(f"Right({value})")
                     self.log_operation("INSERT", value, "Success", f"Path: {' → '.join(path)}")
                     return True
@@ -120,35 +117,31 @@ class BinarySearchTree:
     
     def delete(self, value):
         """Delete a value from BST"""
-        self.root, deleted = self._delete_node(self.root, value)
-        if deleted:
-            self.log_operation("DELETE", value, "Success", "Node deleted successfully")
-        else:
-            self.log_operation("DELETE", value, "Failed", "Value not found")
+        self.root = self._delete_node(self.root, value)
+        self.log_operation("DELETE", value, "Success", "Node deleted successfully")
     
     def _delete_node(self, node, value):
         """Recursive helper for delete"""
         if node is None:
-            return node, False
+            return node
         
         if value < node.value:
-            node.left, deleted = self._delete_node(node.left, value)
+            node.left = self._delete_node(node.left, value)
         elif value > node.value:
-            node.right, deleted = self._delete_node(node.right, value)
+            node.right = self._delete_node(node.right, value)
         else:
             # Node found
             if node.left is None:
-                return node.right, True
+                return node.right
             elif node.right is None:
-                return node.left, True
+                return node.left
             
             # Node with two children
             min_node = self._find_min_node(node.right)
             node.value = min_node.value
-            node.right, _ = self._delete_node(node.right, min_node.value)
-            return node, True
+            node.right = self._delete_node(node.right, min_node.value)
         
-        return node, deleted
+        return node
     
     def _find_min_node(self, node):
         """Find node with minimum value in subtree"""
@@ -168,7 +161,6 @@ class BinarySearchTree:
                 traverse(node.right)
         
         traverse(self.root)
-        self.log_operation("TRAVERSAL", "INORDER", f"Result: {result}", "Left → Root → Right")
         return result
     
     def preorder_traversal(self):
@@ -182,7 +174,6 @@ class BinarySearchTree:
                 traverse(node.right)
         
         traverse(self.root)
-        self.log_operation("TRAVERSAL", "PREORDER", f"Result: {result}", "Root → Left → Right")
         return result
     
     def postorder_traversal(self):
@@ -196,7 +187,6 @@ class BinarySearchTree:
                 result.append(node.value)
         
         traverse(self.root)
-        self.log_operation("TRAVERSAL", "POSTORDER", f"Result: {result}", "Left → Right → Root")
         return result
     
     def level_order_traversal(self):
@@ -216,7 +206,6 @@ class BinarySearchTree:
             if node.right:
                 queue.append(node.right)
         
-        self.log_operation("TRAVERSAL", "LEVELORDER", f"Result: {result}", "Breadth-first level by level")
         return result
     
     def height(self):
@@ -241,9 +230,10 @@ class BinarySearchTree:
                 'is_balanced': True
             }
         
-        node_count = len(self.inorder_traversal())
-        min_val = self.find_min()
-        max_val = self.find_max()
+        inorder = self.inorder_traversal()
+        node_count = len(inorder)
+        min_val = min(inorder) if inorder else None
+        max_val = max(inorder) if inorder else None
         
         return {
             'root': self.root.value,
@@ -284,73 +274,87 @@ class BinarySearchTree:
         balanced, _ = check_balance(self.root)
         return balanced
     
-    def visualize_text_tree(self):
+    def visualize_tree(self):
         """Create a text-based visualization of the tree"""
         if self.root is None:
             return "🌳 Tree is empty!"
         
-        lines = []
-        levels = self._get_tree_levels()
+        # Get all nodes by level
+        levels = []
+        queue = deque([(self.root, 0)])
         
-        for i, level in enumerate(levels):
-            indent = " " * (2 ** (len(levels) - i) - 2)
-            line = indent
-            for node in level:
-                if node is not None:
-                    line += f"{node:2d}" + " " * (2 ** (len(levels) - i + 1) - 2)
-                else:
-                    line += "  " + " " * (2 ** (len(levels) - i + 1) - 2)
-            lines.append(line)
+        while queue:
+            node, level = queue.popleft()
+            if level >= len(levels):
+                levels.append([])
             
-            # Add connecting lines
-            if i < len(levels) - 1:
-                connector_line = indent
-                next_level = levels[i + 1]
-                for j in range(len(level)):
-                    if level[j] is not None:
-                        left_exists = j * 2 < len(next_level) and next_level[j * 2] is not None
-                        right_exists = j * 2 + 1 < len(next_level) and next_level[j * 2 + 1] is not None
-                        
-                        if left_exists or right_exists:
-                            connector_line += "┌─" + " " * (2 ** (len(levels) - i) - 4) + "┴─" + " " * (2 ** (len(levels) - i) - 4) + "┐"
-                        else:
-                            connector_line += " " * (2 ** (len(levels) - i + 1))
+            if node:
+                levels[level].append(str(node.value))
+                queue.append((node.left, level + 1))
+                queue.append((node.right, level + 1))
+            else:
+                levels[level].append(" ")
+                # Still add placeholders for children to maintain structure
+                if level < 4:  # Limit depth for display
+                    queue.append((None, level + 1))
+                    queue.append((None, level + 1))
+        
+        # Build the visualization
+        lines = []
+        for i, level in enumerate(levels):
+            if any(node != " " for node in level):
+                indent = "  " * (2 ** (len(levels) - i - 1) - 1)
+                line = indent + ("  " * (2 ** (len(levels) - i - 1)))
+                
+                for j, node in enumerate(level):
+                    if node != " ":
+                        line += f"{node:^3}"
                     else:
-                        connector_line += " " * (2 ** (len(levels) - i + 1))
-                lines.append(connector_line)
+                        line += "   "
+                    # Add spacing between nodes
+                    if j < len(level) - 1:
+                        line += " " * (2 ** (len(levels) - i) - 1)
+                
+                lines.append(line)
+                
+                # Add connecting lines for next level
+                if i < len(levels) - 1 and any(n != " " for n in levels[i]):
+                    connector_line = indent + ("  " * (2 ** (len(levels) - i - 1)))
+                    for j in range(len(level)):
+                        if level[j] != " ":
+                            connector_line += " / \\ "
+                        else:
+                            connector_line += "     "
+                        if j < len(level) - 1:
+                            connector_line += " " * (2 ** (len(levels) - i) - 5)
+                    lines.append(connector_line)
         
         return "\n".join(lines)
     
-    def _get_tree_levels(self):
-        """Get tree nodes by levels for visualization"""
+    def get_tree_structure(self):
+        """Get a simple tree structure representation"""
         if self.root is None:
-            return []
+            return "Empty Tree"
         
-        levels = []
-        queue = deque([self.root])
-        
-        while queue:
-            level_size = len(queue)
-            current_level = []
-            all_none = True
+        def build_structure(node, prefix="", is_left=True):
+            if node is None:
+                return ""
             
-            for _ in range(level_size):
-                node = queue.popleft()
-                if node:
-                    all_none = False
-                    current_level.append(node.value)
-                    queue.append(node.left if node.left else None)
-                    queue.append(node.right if node.right else None)
-                else:
-                    current_level.append(None)
-                    queue.append(None)
-                    queue.append(None)
+            result = ""
+            result += prefix
+            result += "└── " if is_left else "┌── "
+            result += str(node.value) + "\n"
             
-            if all_none:
-                break
-            levels.append(current_level)
+            # Process children
+            if node.left or node.right:
+                if node.left:
+                    result += build_structure(node.left, prefix + ("    " if is_left else "│   "), True)
+                if node.right:
+                    result += build_structure(node.right, prefix + ("    " if is_left else "│   "), False)
+            
+            return result
         
-        return levels
+        return build_structure(self.root)
 
 def initialize_session_state():
     """Initialize Streamlit session state"""
@@ -358,6 +362,8 @@ def initialize_session_state():
         st.session_state.bst = BinarySearchTree()
     if 'auto_demo_done' not in st.session_state:
         st.session_state.auto_demo_done = False
+    if 'last_operation' not in st.session_state:
+        st.session_state.last_operation = None
 
 def main():
     """Main Streamlit application"""
@@ -401,6 +407,15 @@ def main():
         border: 2px solid #2E8B57;
         white-space: pre;
         overflow-x: auto;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    .history-item {
+        padding: 0.5rem;
+        border-left: 3px solid #2E8B57;
+        background-color: #f8f9fa;
+        margin-bottom: 0.5rem;
+        border-radius: 5px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -415,25 +430,25 @@ def main():
         # Insert operation
         st.subheader("Insert Node")
         insert_val = st.number_input("Enter value to insert:", step=1, value=50, key="insert")
-        if st.button("🚀 Insert", use_container_width=True):
+        if st.button("🚀 Insert", use_container_width=True, key="insert_btn"):
             st.session_state.bst.insert(insert_val)
+            st.session_state.last_operation = f"INSERT {insert_val}"
             st.rerun()
         
         # Search operation
         st.subheader("Search Node")
         search_val = st.number_input("Enter value to search:", step=1, value=50, key="search")
-        if st.button("🔍 Search", use_container_width=True):
+        if st.button("🔍 Search", use_container_width=True, key="search_btn"):
             found = st.session_state.bst.contains(search_val)
-            if found:
-                st.success(f"✅ Value {search_val} found!")
-            else:
-                st.error(f"❌ Value {search_val} not found!")
+            st.session_state.last_operation = f"SEARCH {search_val}"
+            st.rerun()
         
         # Delete operation
         st.subheader("Delete Node")
         delete_val = st.number_input("Enter value to delete:", step=1, value=50, key="delete")
-        if st.button("🗑️ Delete", use_container_width=True):
+        if st.button("🗑️ Delete", use_container_width=True, key="delete_btn"):
             st.session_state.bst.delete(delete_val)
+            st.session_state.last_operation = f"DELETE {delete_val}"
             st.rerun()
         
         st.markdown("---")
@@ -442,36 +457,34 @@ def main():
         st.subheader("Tree Operations")
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("📈 Find Min", use_container_width=True):
+            if st.button("📈 Find Min", use_container_width=True, key="min_btn"):
                 min_val = st.session_state.bst.find_min()
-                if min_val is not None:
-                    st.info(f"Minimum: {min_val}")
-                else:
-                    st.warning("Tree is empty!")
+                st.session_state.last_operation = "FIND_MIN"
+                st.rerun()
         
         with col2:
-            if st.button("📉 Find Max", use_container_width=True):
+            if st.button("📉 Find Max", use_container_width=True, key="max_btn"):
                 max_val = st.session_state.bst.find_max()
-                if max_val is not None:
-                    st.info(f"Maximum: {max_val}")
-                else:
-                    st.warning("Tree is empty!")
+                st.session_state.last_operation = "FIND_MAX"
+                st.rerun()
         
         # Demo operations
         st.markdown("---")
         st.subheader("Demo Operations")
         demo_values = [50, 30, 70, 20, 40, 60, 80, 10, 25, 35, 45]
         
-        if st.button("🎮 Auto Demo", use_container_width=True):
+        if st.button("🎮 Auto Demo", use_container_width=True, key="demo_btn"):
             st.session_state.bst = BinarySearchTree()
             for val in demo_values:
                 st.session_state.bst.insert(val)
             st.session_state.auto_demo_done = True
+            st.session_state.last_operation = "DEMO"
             st.rerun()
         
-        if st.button("🧹 Clear Tree", use_container_width=True):
+        if st.button("🧹 Clear Tree", use_container_width=True, key="clear_btn"):
             st.session_state.bst = BinarySearchTree()
             st.session_state.auto_demo_done = False
+            st.session_state.last_operation = "CLEAR"
             st.rerun()
     
     # Main content area
@@ -481,32 +494,41 @@ def main():
         st.header("🌳 Tree Visualization")
         
         # Text-based tree visualization
-        tree_visualization = st.session_state.bst.visualize_text_tree()
+        tree_structure = st.session_state.bst.get_tree_structure()
         st.markdown("### Tree Structure:")
-        st.markdown(f'<div class="tree-visualization">{tree_visualization}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="tree-visualization">{tree_structure}</div>', unsafe_allow_html=True)
+        
+        # Alternative simple visualization
+        st.markdown("### Simple View:")
+        if st.session_state.bst.root:
+            simple_view = f"Root: {st.session_state.bst.root.value}"
+            if st.session_state.bst.root.left:
+                simple_view += f" | Left: {st.session_state.bst.root.left.value}"
+            if st.session_state.bst.root.right:
+                simple_view += f" | Right: {st.session_state.bst.root.right.value}"
+            st.code(simple_view)
         
         # Tree traversals
         st.header("🔄 Tree Traversals")
         if st.session_state.bst.root is not None:
-            trav_col1, trav_col2 = st.columns(2)
+            # Display all traversals at once
+            col1, col2, col3, col4 = st.columns(4)
             
-            with trav_col1:
-                if st.button("In-order", key="inorder"):
-                    result = st.session_state.bst.inorder_traversal()
-                    st.write(f"**In-order (Sorted):** {result}")
-                
-                if st.button("Pre-order", key="preorder"):
-                    result = st.session_state.bst.preorder_traversal()
-                    st.write(f"**Pre-order:** {result}")
+            with col1:
+                st.subheader("In-order")
+                st.code(f"{st.session_state.bst.inorder_traversal()}")
             
-            with trav_col2:
-                if st.button("Post-order", key="postorder"):
-                    result = st.session_state.bst.postorder_traversal()
-                    st.write(f"**Post-order:** {result}")
-                
-                if st.button("Level-order", key="levelorder"):
-                    result = st.session_state.bst.level_order_traversal()
-                    st.write(f"**Level-order:** {result}")
+            with col2:
+                st.subheader("Pre-order")
+                st.code(f"{st.session_state.bst.preorder_traversal()}")
+            
+            with col3:
+                st.subheader("Post-order")
+                st.code(f"{st.session_state.bst.postorder_traversal()}")
+            
+            with col4:
+                st.subheader("Level-order")
+                st.code(f"{st.session_state.bst.level_order_traversal()}")
         else:
             st.info("🌱 Tree is empty. Insert some values to see traversals!")
     
@@ -532,21 +554,23 @@ def main():
             st.warning("🌱 Tree is empty!")
         
         # Operations history
-        st.header("📝 Recent Operations")
+        st.header("📝 Operations History")
         if st.session_state.bst.operations_history:
-            recent_ops = st.session_state.bst.operations_history[-8:]  # Last 8 operations
+            # Show last 10 operations
+            recent_ops = st.session_state.bst.operations_history[-10:]
             
-            for op in reversed(recent_ops):
+            for i, op in enumerate(reversed(recent_ops)):
                 with st.container():
                     st.markdown(f"""
-                    <div class="operation-card">
-                        <strong>{op['operation']}</strong> {f"({op['value']})" if op['value'] else ""}<br>
-                        <small>Result: {op['result']}</small><br>
+                    <div class="history-item">
+                        <strong>{op['operation']}</strong> 
+                        {f"<strong>({op['value']})</strong>" if op['value'] is not None else ""}<br>
+                        <small>Status: {op['result']}</small><br>
                         <small style="color: #666;">{op['details']}</small>
                     </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info("No operations yet!")
+            st.info("No operations yet. Start by inserting values!")
     
     # Demo explanation
     if st.session_state.auto_demo_done:
