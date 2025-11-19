@@ -1,5 +1,4 @@
 import streamlit as st
-import graphviz
 import pandas as pd
 import time
 from collections import deque
@@ -285,31 +284,73 @@ class BinarySearchTree:
         balanced, _ = check_balance(self.root)
         return balanced
     
-    def visualize_graphviz(self):
-        """Create Graphviz visualization of the tree"""
-        dot = graphviz.Digraph()
-        dot.attr('node', shape='circle')
-        
+    def visualize_text_tree(self):
+        """Create a text-based visualization of the tree"""
         if self.root is None:
-            dot.node('empty', 'Empty Tree', shape='plaintext')
-            return dot
+            return "🌳 Tree is empty!"
         
-        # Add nodes and edges recursively
-        def add_nodes_edges(node, parent_id=None, direction=''):
-            if node is None:
-                return
-            
-            node_id = f'node_{node.value}'
-            dot.node(node_id, str(node.value))
-            
-            if parent_id:
-                dot.edge(parent_id, node_id, label=direction)
-            
-            add_nodes_edges(node.left, node_id, 'L')
-            add_nodes_edges(node.right, node_id, 'R')
+        lines = []
+        levels = self._get_tree_levels()
         
-        add_nodes_edges(self.root)
-        return dot
+        for i, level in enumerate(levels):
+            indent = " " * (2 ** (len(levels) - i) - 2)
+            line = indent
+            for node in level:
+                if node is not None:
+                    line += f"{node:2d}" + " " * (2 ** (len(levels) - i + 1) - 2)
+                else:
+                    line += "  " + " " * (2 ** (len(levels) - i + 1) - 2)
+            lines.append(line)
+            
+            # Add connecting lines
+            if i < len(levels) - 1:
+                connector_line = indent
+                next_level = levels[i + 1]
+                for j in range(len(level)):
+                    if level[j] is not None:
+                        left_exists = j * 2 < len(next_level) and next_level[j * 2] is not None
+                        right_exists = j * 2 + 1 < len(next_level) and next_level[j * 2 + 1] is not None
+                        
+                        if left_exists or right_exists:
+                            connector_line += "┌─" + " " * (2 ** (len(levels) - i) - 4) + "┴─" + " " * (2 ** (len(levels) - i) - 4) + "┐"
+                        else:
+                            connector_line += " " * (2 ** (len(levels) - i + 1))
+                    else:
+                        connector_line += " " * (2 ** (len(levels) - i + 1))
+                lines.append(connector_line)
+        
+        return "\n".join(lines)
+    
+    def _get_tree_levels(self):
+        """Get tree nodes by levels for visualization"""
+        if self.root is None:
+            return []
+        
+        levels = []
+        queue = deque([self.root])
+        
+        while queue:
+            level_size = len(queue)
+            current_level = []
+            all_none = True
+            
+            for _ in range(level_size):
+                node = queue.popleft()
+                if node:
+                    all_none = False
+                    current_level.append(node.value)
+                    queue.append(node.left if node.left else None)
+                    queue.append(node.right if node.right else None)
+                else:
+                    current_level.append(None)
+                    queue.append(None)
+                    queue.append(None)
+            
+            if all_none:
+                break
+            levels.append(current_level)
+        
+        return levels
 
 def initialize_session_state():
     """Initialize Streamlit session state"""
@@ -352,6 +393,15 @@ def main():
         border-radius: 10px;
         margin: 1rem 0;
     }
+    .tree-visualization {
+        font-family: 'Courier New', monospace;
+        background-color: #f8f9fa;
+        padding: 2rem;
+        border-radius: 10px;
+        border: 2px solid #2E8B57;
+        white-space: pre;
+        overflow-x: auto;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -364,14 +414,14 @@ def main():
         
         # Insert operation
         st.subheader("Insert Node")
-        insert_val = st.number_input("Enter value to insert:", step=1, value=50)
+        insert_val = st.number_input("Enter value to insert:", step=1, value=50, key="insert")
         if st.button("🚀 Insert", use_container_width=True):
             st.session_state.bst.insert(insert_val)
             st.rerun()
         
         # Search operation
         st.subheader("Search Node")
-        search_val = st.number_input("Enter value to search:", step=1, value=50)
+        search_val = st.number_input("Enter value to search:", step=1, value=50, key="search")
         if st.button("🔍 Search", use_container_width=True):
             found = st.session_state.bst.contains(search_val)
             if found:
@@ -381,7 +431,7 @@ def main():
         
         # Delete operation
         st.subheader("Delete Node")
-        delete_val = st.number_input("Enter value to delete:", step=1, value=50)
+        delete_val = st.number_input("Enter value to delete:", step=1, value=50, key="delete")
         if st.button("🗑️ Delete", use_container_width=True):
             st.session_state.bst.delete(delete_val)
             st.rerun()
@@ -430,32 +480,31 @@ def main():
     with col1:
         st.header("🌳 Tree Visualization")
         
-        # Graphviz visualization
-        dot = st.session_state.bst.visualize_graphviz()
-        st.graphviz_chart(dot, use_container_width=True)
+        # Text-based tree visualization
+        tree_visualization = st.session_state.bst.visualize_text_tree()
+        st.markdown("### Tree Structure:")
+        st.markdown(f'<div class="tree-visualization">{tree_visualization}</div>', unsafe_allow_html=True)
         
         # Tree traversals
         st.header("🔄 Tree Traversals")
         if st.session_state.bst.root is not None:
-            trav_col1, trav_col2, trav_col3, trav_col4 = st.columns(4)
+            trav_col1, trav_col2 = st.columns(2)
             
             with trav_col1:
-                if st.button("In-order"):
+                if st.button("In-order", key="inorder"):
                     result = st.session_state.bst.inorder_traversal()
-                    st.write(f"**In-order:** {result}")
-            
-            with trav_col2:
-                if st.button("Pre-order"):
+                    st.write(f"**In-order (Sorted):** {result}")
+                
+                if st.button("Pre-order", key="preorder"):
                     result = st.session_state.bst.preorder_traversal()
                     st.write(f"**Pre-order:** {result}")
             
-            with trav_col3:
-                if st.button("Post-order"):
+            with trav_col2:
+                if st.button("Post-order", key="postorder"):
                     result = st.session_state.bst.postorder_traversal()
                     st.write(f"**Post-order:** {result}")
-            
-            with trav_col4:
-                if st.button("Level-order"):
+                
+                if st.button("Level-order", key="levelorder"):
                     result = st.session_state.bst.level_order_traversal()
                     st.write(f"**Level-order:** {result}")
         else:
